@@ -14,10 +14,10 @@ export class DITest extends cc.Component {
 
         const assert = (condition: boolean, message: string) => {
             if (condition) {
-                cc.log(`[DITest] ✅ ${message}`);
+                cc.log(`[DITest] PASS ${message}`);
                 passed++;
             } else {
-                cc.error(`[DITest] ❌ ${message}`);
+                cc.error(`[DITest] FAIL ${message}`);
                 failed++;
             }
         };
@@ -85,9 +85,9 @@ export class DITest extends cc.Component {
         cc.log(`[DITest] Итог: ${passed} passed, ${failed} failed`);
 
         if (failed === 0) {
-            cc.log('[DITest]  Все тесты прошли успешно!');
+            cc.log('[DITest] Все тесты прошли успешно!');
         } else {
-            cc.error(`[DITest]  Провалено тестов: ${failed}`);
+            cc.error(`[DITest] Провалено тестов: ${failed}`);
         }
     }
 }
