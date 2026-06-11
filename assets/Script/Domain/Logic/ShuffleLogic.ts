@@ -5,15 +5,21 @@ import { TileType }   from '../Models/TileType';
 export class ShuffleLogic {
 
     hasValidGroup(board: BoardModel, minGroupSize: number): boolean {
+        const visited = new Set<string>();
+
         for (let r = 0; r < board.rows; r++) {
             for (let c = 0; c < board.cols; c++) {
                 const tile = board.getTile(r, c)!;
                 if (tile.isEmpty) continue;
 
-                const groupSize = this.countGroup(board, r, c, tile.type, new Set());
-                if (groupSize >= minGroupSize) return true;
+                const key = `${r}:${c}`;
+                if (visited.has(key)) continue;
+
+                const group = this.bfsGroup(board, r, c, tile.type, visited);
+                if (group >= minGroupSize) return true;
             }
         }
+
         return false;
     }
 
@@ -21,28 +27,32 @@ export class ShuffleLogic {
         const nonEmpty = board.getAllTiles().filter(t => !t.isEmpty);
 
         for (let i = nonEmpty.length - 1; i > 0; i--) {
-            const j              = Math.floor(Math.random() * (i + 1));
-            const tmpType        = nonEmpty[i].type;
-            const tmpSuper       = nonEmpty[i].superType;
-            nonEmpty[i].type     = nonEmpty[j].type;
+            const j               = Math.floor(Math.random() * (i + 1));
+            const tmpType         = nonEmpty[i].type;
+            const tmpSuper        = nonEmpty[i].superType;
+            nonEmpty[i].type      = nonEmpty[j].type;
             nonEmpty[i].superType = nonEmpty[j].superType;
-            nonEmpty[j].type     = tmpType;
+            nonEmpty[j].type      = tmpType;
             nonEmpty[j].superType = tmpSuper;
         }
     }
 
-    private countGroup(board: BoardModel, row: number, col: number, type: TileType, visited: Set<string>): number {
-        const key = `${row}:${col}`;
-        if (visited.has(key)) return 0;
+    private bfsGroup(board: BoardModel, startRow: number, startCol: number, type: TileType, visited: Set<string>): number {
+        const queue: Array<{ row: number; col: number }> = [{ row: startRow, col: startCol }];
+        visited.add(`${startRow}:${startCol}`);
+        let count = 0;
 
-        const tile = board.getTile(row, col);
-        if (!tile || tile.type !== type) return 0;
+        while (queue.length > 0) {
+            const { row, col } = queue.shift()!;
+            count++;
 
-        visited.add(key);
-        let count = 1;
-
-        for (const neighbour of board.getNeighbours(row, col)) {
-            count += this.countGroup(board, neighbour.row, neighbour.col, type, visited);
+            for (const neighbour of board.getNeighbours(row, col)) {
+                const key = `${neighbour.row}:${neighbour.col}`;
+                if (!visited.has(key) && neighbour.type === type) {
+                    visited.add(key);
+                    queue.push({ row: neighbour.row, col: neighbour.col });
+                }
+            }
         }
 
         return count;
