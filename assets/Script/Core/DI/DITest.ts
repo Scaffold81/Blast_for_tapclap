@@ -3,7 +3,6 @@ import { TYPES } from './Types';
 
 const { ccclass } = cc._decorator;
 
-// Вешается на ноду в StartScene, гоняет тесты и самоуничтожается духовно.
 @ccclass
 export class DITest extends cc.Component {
 

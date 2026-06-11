@@ -3,10 +3,6 @@ import { IState } from './IState';
 
 const { ccclass } = cc._decorator;
 
-/**
- * Тест FSM — вешается на ноду в StartScene.
- * Каждый тест работает на своём new StateMachine() — полная изоляция.
- */
 @ccclass
 export class FSMTest extends cc.Component {
 
@@ -27,7 +23,6 @@ export class FSMTest extends cc.Component {
             }
         };
 
-        // Фабрика мок-состояния — считает сколько раз вызвали enter и exit
         const makeState = () => {
             const state = {
                 enterCount: 0,
@@ -38,10 +33,9 @@ export class FSMTest extends cc.Component {
             return state;
         };
 
-        // 1. register + enter: enter вызывается при входе в состояние
         {
-            const fsm   = new StateMachine();
-            const idle  = makeState();
+            const fsm  = new StateMachine();
+            const idle = makeState();
 
             fsm.register('Idle', idle);
             fsm.enter('Idle');
@@ -50,7 +44,6 @@ export class FSMTest extends cc.Component {
             assert(idle.exitCount  === 0, 'register+enter: exit не вызван');
         }
 
-        // 2. Переключение: exit старого, enter нового
         {
             const fsm        = new StateMachine();
             const idle       = makeState();
@@ -62,12 +55,11 @@ export class FSMTest extends cc.Component {
             fsm.enter('Idle');
             fsm.enter('Processing');
 
-            assert(idle.exitCount       === 1, 'switch: exit у Idle вызван');
+            assert(idle.exitCount        === 1, 'switch: exit у Idle вызван');
             assert(processing.enterCount === 1, 'switch: enter у Processing вызван');
-            assert(idle.enterCount      === 1, 'switch: повторный enter у Idle не вызван');
+            assert(idle.enterCount       === 1, 'switch: повторный enter у Idle не вызван');
         }
 
-        // 3. Повторный enter в то же состояние — ничего не происходит
         {
             const fsm  = new StateMachine();
             const idle = makeState();
@@ -80,7 +72,6 @@ export class FSMTest extends cc.Component {
             assert(idle.exitCount  === 0, 'same state: exit не вызван');
         }
 
-        // 4. is(): правильно определяет текущее состояние
         {
             const fsm     = new StateMachine();
             const idle    = makeState();
@@ -94,7 +85,6 @@ export class FSMTest extends cc.Component {
             assert(!fsm.is('Falling'), 'is: Falling — false для не текущего');
         }
 
-        // 5. getCurrentName(): возвращает имя текущего состояния
         {
             const fsm        = new StateMachine();
             const idle       = makeState();
@@ -110,15 +100,14 @@ export class FSMTest extends cc.Component {
             assert(fsm.getCurrentName() === 'Processing', 'getCurrentName: Processing после переключения');
         }
 
-        // 6. Полная цепочка игровых состояний
         {
-            const fsm       = new StateMachine();
-            const idle      = makeState();
+            const fsm        = new StateMachine();
+            const idle       = makeState();
             const processing = makeState();
-            const falling   = makeState();
-            const filling   = makeState();
-            const checkWin  = makeState();
-            const gameOver  = makeState();
+            const falling    = makeState();
+            const filling    = makeState();
+            const checkWin   = makeState();
+            const gameOver   = makeState();
 
             fsm.register('Idle',       idle);
             fsm.register('Processing', processing);
@@ -134,16 +123,15 @@ export class FSMTest extends cc.Component {
             fsm.enter('CheckWin');
             fsm.enter('GameOver');
 
-            assert(fsm.is('GameOver'),           'chain: финальное состояние GameOver');
-            assert(idle.exitCount       === 1,   'chain: Idle.exit вызван 1 раз');
-            assert(processing.exitCount === 1,   'chain: Processing.exit вызван 1 раз');
-            assert(falling.exitCount    === 1,   'chain: Falling.exit вызван 1 раз');
-            assert(filling.exitCount    === 1,   'chain: Filling.exit вызван 1 раз');
-            assert(checkWin.exitCount   === 1,   'chain: CheckWin.exit вызван 1 раз');
-            assert(gameOver.exitCount   === 0,   'chain: GameOver.exit не вызван — конечное');
+            assert(fsm.is('GameOver'),         'chain: финальное состояние GameOver');
+            assert(idle.exitCount       === 1, 'chain: Idle.exit вызван 1 раз');
+            assert(processing.exitCount === 1, 'chain: Processing.exit вызван 1 раз');
+            assert(falling.exitCount    === 1, 'chain: Falling.exit вызван 1 раз');
+            assert(filling.exitCount    === 1, 'chain: Filling.exit вызван 1 раз');
+            assert(checkWin.exitCount   === 1, 'chain: CheckWin.exit вызван 1 раз');
+            assert(gameOver.exitCount   === 0, 'chain: GameOver.exit не вызван — конечное');
         }
 
-        // 7. enter незарегистрированного состояния — бросает ошибку
         {
             const fsm = new StateMachine();
 

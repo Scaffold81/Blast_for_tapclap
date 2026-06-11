@@ -1,14 +1,10 @@
 import { EventBus, eventBus } from '../Events/EventBus';
 import { GameEventMap } from '../Events/GameEvents';
-import { TileModel, TileType } from '../../Domain/Models/TileModel';
+import { TileModel }    from '../../Domain/Models/TileModel';
+import { TileType }     from '../../Domain/Models/TileType';
 
 const { ccclass } = cc._decorator;
 
-/**
- * Тест EventBus — вешается на ноду в StartScene рядом с DITest.
- * Каждый тест работает на своём new EventBus() — полная изоляция.
- * Гоняет все сценарии в onLoad, пишет результат в консоль.
- */
 @ccclass
 export class EventBusTest extends cc.Component {
 
@@ -29,7 +25,6 @@ export class EventBusTest extends cc.Component {
             }
         };
 
-        // 1. on + emit: примитивный payload
         {
             const bus = new EventBus();
             let received: GameEventMap['score:changed'] | null = null;
@@ -37,12 +32,11 @@ export class EventBusTest extends cc.Component {
             bus.on('score:changed', data => { received = data; });
             bus.emit('score:changed', { score: 42, delta: 10 });
 
-            assert(received !== null,              'on+emit: хендлер вызван');
-            assert(received!.score === 42,         'on+emit: score = 42');
-            assert(received!.delta === 10,         'on+emit: delta = 10');
+            assert(received !== null,      'on+emit: хендлер вызван');
+            assert(received!.score === 42, 'on+emit: score = 42');
+            assert(received!.delta === 10, 'on+emit: delta = 10');
         }
 
-        // 2. on + emit: void payload
         {
             const bus = new EventBus();
             let called = false;
@@ -53,22 +47,21 @@ export class EventBusTest extends cc.Component {
             assert(called, 'void payload: хендлер вызван без аргументов');
         }
 
-        // 3. on + emit: сложный payload с TileModel
         {
-            const bus = new EventBus();
-            const tile = new TileModel(2, 3, TileType.Red);
+            const bus  = new EventBus();
+            const RED  = 'red' as TileType;
+            const tile = new TileModel(2, 3, RED);
             let receivedTile: TileModel | null = null;
 
             bus.on('blast:complete', data => { receivedTile = data.clickedTile; });
             bus.emit('blast:complete', { tiles: [tile], clickedTile: tile });
 
-            assert(receivedTile !== null,               'TileModel payload: хендлер вызван');
-            assert(receivedTile!.row === 2,             'TileModel payload: row = 2');
-            assert(receivedTile!.col === 3,             'TileModel payload: col = 3');
-            assert(receivedTile!.type === TileType.Red, 'TileModel payload: type = Red');
+            assert(receivedTile !== null,      'TileModel payload: хендлер вызван');
+            assert(receivedTile!.row === 2,    'TileModel payload: row = 2');
+            assert(receivedTile!.col === 3,    'TileModel payload: col = 3');
+            assert(receivedTile!.type === RED, 'TileModel payload: type = Red');
         }
 
-        // 4. Несколько подписчиков на одно событие
         {
             const bus = new EventBus();
             let count = 0;
@@ -85,7 +78,6 @@ export class EventBusTest extends cc.Component {
             assert(count === 3, `Несколько подписчиков: вызваны все (count = ${count}, ожидаем 3)`);
         }
 
-        // 5. Дублирующий хендлер не добавляется дважды
         {
             const bus = new EventBus();
             let count = 0;
@@ -99,7 +91,6 @@ export class EventBusTest extends cc.Component {
             assert(count === 1, `Дубль хендлера: вызван ровно 1 раз (count = ${count})`);
         }
 
-        // 6. off: отписка работает
         {
             const bus = new EventBus();
             let count = 0;
@@ -114,7 +105,6 @@ export class EventBusTest extends cc.Component {
             assert(count === 1, 'off: после отписки хендлер не вызывается');
         }
 
-        // 7. once: срабатывает ровно один раз
         {
             const bus = new EventBus();
             let count = 0;
@@ -127,7 +117,6 @@ export class EventBusTest extends cc.Component {
             assert(count === 1, `once: сработал ровно 1 раз (count = ${count})`);
         }
 
-        // 8. offAll: снимает все подписки одного хендлера
         {
             const bus = new EventBus();
             let scoreCount = 0;
@@ -155,7 +144,6 @@ export class EventBusTest extends cc.Component {
             assert(loseCount  === 0, 'offAll: lose хендлер снят');
         }
 
-        // 9. clear: сбрасывает всю шину
         {
             const bus = new EventBus();
             let called = false;
@@ -167,7 +155,6 @@ export class EventBusTest extends cc.Component {
             assert(!called, 'clear: после очистки хендлеры не вызываются');
         }
 
-        // 10. Глобальный eventBus изолирован от локальных экземпляров
         {
             let globalCalled = false;
             let localCalled  = false;

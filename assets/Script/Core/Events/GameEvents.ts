@@ -1,7 +1,3 @@
-/** Все игровые события. Если хочешь добавить новое — просто допиши сюда */
-
-// ─── Payload-типы ──────────────────────────────────────────────────────────
-
 import { TileModel } from '../../Domain/Models/TileModel';
 
 export interface BlastCompleteEvent {
@@ -52,8 +48,7 @@ export interface GameLoseEvent {
     reason: 'no_moves' | 'no_groups' | 'no_shuffles';
 }
 
-// ─── Маппинг событие → payload ─────────────────────────────────────────────
-
+/** Маппинг всех игровых событий на их payload-типы. Добавить новое событие — значит добавить строку сюда. */
 export interface GameEventMap {
     'blast:complete':        BlastCompleteEvent;
     'score:changed':         ScoreChangedEvent;
