@@ -3,7 +3,7 @@ import { TYPES }                  from '../Core/DI/Types';
 import { eventBus }               from '../Core/Events/EventBus';
 import { StateMachine }           from '../Core/FSM/StateMachine';
 import { BoardModel }             from '../Domain/Models/BoardModel';
-import { TileModel }             from '../Domain/Models/TileModel';
+import { TileModel }              from '../Domain/Models/TileModel';
 import { ScoreModel }             from '../Domain/Models/ScoreModel';
 import { BlastLogic }             from '../Domain/Logic/BlastLogic';
 import { FallLogic }              from '../Domain/Logic/FallLogic';
@@ -26,7 +26,6 @@ import { BoardConfig }            from '../Config/BoardConfig';
 import { BoosterConfig }          from '../Config/BoosterConfig';
 import { TileSpriteConfig }       from '../Config/TileSpriteConfig';
 import { BoardView }              from '../Presentation/Views/BoardView';
-import { HUDView }                from '../Presentation/UI/HUDView';
 
 const { ccclass, property } = cc._decorator;
 
@@ -36,9 +35,6 @@ export class GameController extends cc.Component {
 
     @property(BoardView)
     boardView: BoardView = null;
-
-    @property(HUDView)
-    hudView: HUDView = null;
 
     @property(TileSpriteConfig)
     tileSpriteConfig: TileSpriteConfig = null;
@@ -110,13 +106,14 @@ export class GameController extends cc.Component {
         } else {
             cc.error('[GameController] boardView или tileSpriteConfig не привязаны!');
         }
-
-        if (this.hudView) {
-            this.hudView.refresh(this.score.score, this.score.movesLeft, this.score.targetScore);
-        }
     }
 
-    onTileClick(row: number, col: number): void {
+    private subscribeEvents(): void {
+        eventBus.on('game:restart',      () => this.restartGame());
+        eventBus.on('booster:activated', ({ boosterType }) => this.onBoosterActivated(boosterType));
+    }
+
+    private onTileClick(row: number, col: number): void {
         if (!this.fsm.is('Idle')) return;
 
         const tile = this.board.getTile(row, col);
@@ -133,16 +130,25 @@ export class GameController extends cc.Component {
         this.afterBlast();
     }
 
-    onBoosterBomb(row: number, col: number): void {
+    private onBoosterActivated(boosterType: string): void {
         if (!this.fsm.is('Idle')) return;
-        this.fsm.enter('Processing');
-        new BoosterBombCommand(this.board, this.score, GameConfig, row, col, BoosterConfig.bombRadius).execute();
-        this.afterBlast();
-    }
 
-    onBoosterTeleport(rowA: number, colA: number, rowB: number, colB: number): void {
-        if (!this.fsm.is('Idle')) return;
-        new BoosterTeleportCommand(this.board, rowA, colA, rowB, colB).execute();
+        if (boosterType === 'bomb') {
+            const centerRow = Math.floor(BoardConfig.rows / 2);
+            const centerCol = Math.floor(BoardConfig.cols / 2);
+            this.fsm.enter('Processing');
+            new BoosterBombCommand(this.board, this.score, GameConfig, centerRow, centerCol, BoosterConfig.bombRadius).execute();
+            this.afterBlast();
+        } else if (boosterType === 'teleport') {
+            const nonEmpty = this.board.getAllTiles().filter(t => !t.isEmpty);
+            if (nonEmpty.length < 2) return;
+
+            const a = nonEmpty[Math.floor(Math.random() * nonEmpty.length)];
+            let b   = nonEmpty[Math.floor(Math.random() * nonEmpty.length)];
+            while (b === a) b = nonEmpty[Math.floor(Math.random() * nonEmpty.length)];
+
+            new BoosterTeleportCommand(this.board, a.row, a.col, b.row, b.col).execute();
+        }
     }
 
     private afterBlast(): void {
@@ -211,14 +217,7 @@ export class GameController extends cc.Component {
             this.boardView.init(this.board, BoardConfig, sprites);
         }
 
-        if (this.hudView) {
-            this.hudView.refresh(this.score.score, this.score.movesLeft, this.score.targetScore);
-        }
-
-        eventBus.emit('game:restart');
-    }
-
-    private subscribeEvents(): void {
-        eventBus.on('game:restart', () => this.restartGame());
+        eventBus.emit('score:changed', { score: this.score.score, delta: 0 });
+        eventBus.emit('moves:changed', { movesLeft: this.score.movesLeft });
     }
 }
