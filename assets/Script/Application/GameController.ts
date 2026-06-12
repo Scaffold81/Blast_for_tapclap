@@ -3,6 +3,7 @@ import { TYPES }                  from '../Core/DI/Types';
 import { eventBus }               from '../Core/Events/EventBus';
 import { StateMachine }           from '../Core/FSM/StateMachine';
 import { BoardModel }             from '../Domain/Models/BoardModel';
+import { TileModel }             from '../Domain/Models/TileModel';
 import { ScoreModel }             from '../Domain/Models/ScoreModel';
 import { BlastLogic }             from '../Domain/Logic/BlastLogic';
 import { FallLogic }              from '../Domain/Logic/FallLogic';
@@ -51,13 +52,11 @@ export class GameController extends cc.Component {
     private shufflesLeft: number;
 
     onLoad(): void {
-        cc.log('[GameController] onLoad start');
         this.registerDependencies();
         this.initServices();
         this.initFSM();
         this.subscribeEvents();
         this.startGame();
-        cc.log('[GameController] onLoad end');
     }
 
     onDestroy(): void {
@@ -86,8 +85,6 @@ export class GameController extends cc.Component {
         const generator = container.get<BoardGenerator>(TYPES.BoardGenerator);
         this.board = generator.generate(BoardConfig);
         this.score = new ScoreModel(GameConfig.targetScore, GameConfig.maxMoves);
-
-        cc.log(`[GameController] board: ${this.board.rows}x${this.board.cols}, tiles: ${this.board.getAllTiles().filter(t => !t.isEmpty).length}`);
     }
 
     private initFSM(): void {
@@ -102,10 +99,6 @@ export class GameController extends cc.Component {
 
     private startGame(): void {
         this.fsm.enter('Idle');
-
-        cc.log(`[GameController] boardView: ${this.boardView}`);
-        cc.log(`[GameController] tileSpriteConfig: ${this.tileSpriteConfig}`);
-        cc.log(`[GameController] hudView: ${this.hudView}`);
 
         if (this.tileSpriteConfig && this.boardView) {
             const sprites = new SpriteConfigService(this.tileSpriteConfig);
@@ -124,7 +117,6 @@ export class GameController extends cc.Component {
     }
 
     onTileClick(row: number, col: number): void {
-        cc.log(`[GameController] onTileClick: ${row}, ${col}`);
         if (!this.fsm.is('Idle')) return;
 
         const tile = this.board.getTile(row, col);
@@ -155,22 +147,29 @@ export class GameController extends cc.Component {
 
     private afterBlast(): void {
         this.fsm.enter('Falling');
-        this.fall.apply(this.board);
+        const fallResult = this.fall.apply(this.board);
+        eventBus.emit('fall:complete', { changes: fallResult.changes });
 
         this.fsm.enter('Filling');
-        this.fillBoard();
+        const filled = this.fillBoard();
+        eventBus.emit('fill:complete', { tiles: filled });
 
         this.fsm.enter('CheckWin');
         this.checkEndConditions();
     }
 
-    private fillBoard(): void {
-        const colors = ['blue', 'green', 'yellow', 'red', 'purple'].slice(0, BoardConfig.colorCount);
+    private fillBoard(): TileModel[] {
+        const colors  = ['blue', 'green', 'yellow', 'red', 'purple'].slice(0, BoardConfig.colorCount);
+        const filled: TileModel[] = [];
+
         this.board.getAllTiles().forEach(t => {
             if (t.isEmpty) {
                 t.type = colors[Math.floor(Math.random() * colors.length)] as any;
+                filled.push(t);
             }
         });
+
+        return filled;
     }
 
     private checkEndConditions(): void {

@@ -1,9 +1,9 @@
 import { TileModel }             from '../../Domain/Models/TileModel';
 import { ISpriteConfigService }  from '../../Infrastructure/Sprite/ISpriteConfigService';
 
-const { ccclass, property } = cc._decorator;
+const { ccclass } = cc._decorator;
 
-/** Визуальное представление одного тайла. Отображает спрайт, анимирует появление и исчезновение. */
+/** Визуальное представление одного тайла. Знает свою текущую позицию на сетке. */
 @ccclass
 export class TileView extends cc.Component {
 
@@ -11,9 +11,14 @@ export class TileView extends cc.Component {
     private sprites: ISpriteConfigService;
     private sprite:  cc.Sprite;
 
+    row: number = 0;
+    col: number = 0;
+
     init(model: TileModel, sprites: ISpriteConfigService): void {
         this.model   = model;
         this.sprites = sprites;
+        this.row     = model.row;
+        this.col     = model.col;
         this.sprite  = this.getComponent(cc.Sprite);
         this.updateSprite();
     }
@@ -26,6 +31,11 @@ export class TileView extends cc.Component {
             : this.sprites.getSprite(this.model.type);
 
         if (frame) this.sprite.spriteFrame = frame;
+    }
+
+    moveTo(row: number, col: number): void {
+        this.row = row;
+        this.col = col;
     }
 
     playSpawn(): Promise<void> {

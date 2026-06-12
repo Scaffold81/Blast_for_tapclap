@@ -1,4 +1,5 @@
 import { TileModel } from '../../Domain/Models/TileModel';
+import { FallChange } from '../../Domain/Logic/FallLogic';
 
 export interface BlastCompleteEvent {
     tiles: TileModel[];
@@ -15,7 +16,7 @@ export interface MovesChangedEvent {
 }
 
 export interface FallCompleteEvent {
-    tiles: TileModel[];
+    changes: FallChange[];
 }
 
 export interface FillCompleteEvent {

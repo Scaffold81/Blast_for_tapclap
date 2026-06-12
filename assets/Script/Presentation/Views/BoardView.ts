@@ -3,6 +3,7 @@ import { TileModel }             from '../../Domain/Models/TileModel';
 import { BoardModel }            from '../../Domain/Models/BoardModel';
 import { ISpriteConfigService }  from '../../Infrastructure/Sprite/ISpriteConfigService';
 import { IBoardConfig }          from '../../Config/BoardConfig';
+import { FallChange }            from '../../Domain/Logic/FallLogic';
 import { eventBus }              from '../../Core/Events/EventBus';
 
 const { ccclass, property } = cc._decorator;
@@ -51,7 +52,7 @@ export class BoardView extends cc.Component {
         this.views.set(this.key(model.row, model.col), view);
 
         node.on(cc.Node.EventType.TOUCH_END, () => {
-            this.node.emit('tile:click', { row: model.row, col: model.col });
+            this.node.emit('tile:click', { row: view.row, col: view.col });
         });
 
         return view;
@@ -65,23 +66,28 @@ export class BoardView extends cc.Component {
 
     private onBlastComplete(data: { tiles: TileModel[] }): void {
         data.tiles.forEach(tile => {
-            const view = this.views.get(this.key(tile.row, tile.col));
-            if (view) {
-                view.playBlast().then(() => {
-                    view.node.destroy();
-                    this.views.delete(this.key(tile.row, tile.col));
-                });
-            }
+            const key  = this.key(tile.row, tile.col);
+            const view = this.views.get(key);
+            if (!view) return;
+
+            this.views.delete(key);
+            view.playBlast().then(() => view.node.destroy());
         });
     }
 
-    private onFallComplete(data: { tiles: TileModel[] }): void {
-        data.tiles.forEach(tile => {
-            const view = this.views.get(this.key(tile.row, tile.col));
-            if (view) {
-                const pos = this.tilePosition(tile.row, tile.col);
-                view.playFall(pos.y);
-            }
+    private onFallComplete(data: { changes: FallChange[] }): void {
+        data.changes.forEach(change => {
+            const fromKey = this.key(change.from.row, change.from.col);
+            const view    = this.views.get(fromKey);
+            if (!view) return;
+
+            const toKey = this.key(change.to.row, change.to.col);
+            const toPos = this.tilePosition(change.to.row, change.to.col);
+
+            this.views.delete(fromKey);
+            this.views.set(toKey, view);
+            view.moveTo(change.to.row, change.to.col);
+            view.playFall(toPos.y);
         });
     }
 
