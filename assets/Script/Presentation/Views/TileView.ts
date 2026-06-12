@@ -3,6 +3,10 @@ import { ISpriteConfigService }  from '../../Infrastructure/Sprite/ISpriteConfig
 
 const { ccclass } = cc._decorator;
 
+const FALL_DURATION  = 0.3;
+const SPAWN_DURATION = 0.2;
+const BLAST_DURATION = 0.15;
+
 /** Визуальное представление одного тайла. Знает свою текущую позицию на сетке. */
 @ccclass
 export class TileView extends cc.Component {
@@ -38,11 +42,12 @@ export class TileView extends cc.Component {
         this.col = col;
     }
 
-    playSpawn(): Promise<void> {
+    playSpawn(delay: number = 0): Promise<void> {
         return new Promise(resolve => {
             this.node.scale = 0;
             cc.tween(this.node)
-                .to(0.2, { scale: 1 }, { easing: 'backOut' })
+                .delay(delay)
+                .to(SPAWN_DURATION, { scale: 1 }, { easing: 'backOut' })
                 .call(() => resolve())
                 .start();
         });
@@ -51,16 +56,17 @@ export class TileView extends cc.Component {
     playBlast(): Promise<void> {
         return new Promise(resolve => {
             cc.tween(this.node)
-                .to(0.15, { scale: 0 }, { easing: 'backIn' })
+                .to(BLAST_DURATION, { scale: 0 }, { easing: 'backIn' })
                 .call(() => resolve())
                 .start();
         });
     }
 
-    playFall(toY: number): Promise<void> {
+    playFall(toY: number, delay: number = 0): Promise<void> {
         return new Promise(resolve => {
             cc.tween(this.node)
-                .to(0.2, { y: toY }, { easing: 'quadIn' })
+                .delay(delay)
+                .to(FALL_DURATION, { y: toY }, { easing: 'quadIn' })
                 .call(() => resolve())
                 .start();
         });
