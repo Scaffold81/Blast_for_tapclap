@@ -94,8 +94,8 @@ export class BoardView extends cc.Component {
 
     private tilePosition(row: number, col: number): cc.Vec2 {
         const step = this.config.tileSize + this.config.tileSpacing;
-        const x    = col * step - (this.config.cols - 1) * step / 2;
-        const y    = -row * step + (this.config.rows - 1) * step / 2;
+        const x    = col * step - (this.config.cols * step) / 2 + step / 2;
+        const y    = -row * step + (this.config.rows * step) / 2 - step / 2;
         return cc.v2(x, y);
     }
 

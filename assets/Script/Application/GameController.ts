@@ -8,6 +8,7 @@ import { BlastLogic }             from '../Domain/Logic/BlastLogic';
 import { FallLogic }              from '../Domain/Logic/FallLogic';
 import { ShuffleLogic }           from '../Domain/Logic/ShuffleLogic';
 import { BoardGenerator }         from '../Infrastructure/Generator/BoardGenerator';
+import { SpriteConfigService }    from '../Infrastructure/Sprite/SpriteConfigService';
 import { BlastCommand }           from './Commands/BlastCommand';
 import { ShuffleCommand }         from './Commands/ShuffleCommand';
 import { BoosterBombCommand }     from './Commands/BoosterBombCommand';
@@ -22,12 +23,24 @@ import { GameOverState }          from './States/GameOverState';
 import { GameConfig }             from '../Config/GameConfig';
 import { BoardConfig }            from '../Config/BoardConfig';
 import { BoosterConfig }          from '../Config/BoosterConfig';
+import { TileSpriteConfig }       from '../Config/TileSpriteConfig';
+import { BoardView }              from '../Presentation/Views/BoardView';
+import { HUDView }                from '../Presentation/UI/HUDView';
 
-const { ccclass } = cc._decorator;
+const { ccclass, property } = cc._decorator;
 
 /** Точка входа в игровую логику. Собирает DI, запускает FSM, маршрутизирует ввод в команды. */
 @ccclass
 export class GameController extends cc.Component {
+
+    @property(BoardView)
+    boardView: BoardView = null;
+
+    @property(HUDView)
+    hudView: HUDView = null;
+
+    @property(TileSpriteConfig)
+    tileSpriteConfig: TileSpriteConfig = null;
 
     private fsm:          StateMachine;
     private board:        BoardModel;
@@ -38,11 +51,13 @@ export class GameController extends cc.Component {
     private shufflesLeft: number;
 
     onLoad(): void {
+        cc.log('[GameController] onLoad start');
         this.registerDependencies();
         this.initServices();
         this.initFSM();
         this.subscribeEvents();
         this.startGame();
+        cc.log('[GameController] onLoad end');
     }
 
     onDestroy(): void {
@@ -71,6 +86,8 @@ export class GameController extends cc.Component {
         const generator = container.get<BoardGenerator>(TYPES.BoardGenerator);
         this.board = generator.generate(BoardConfig);
         this.score = new ScoreModel(GameConfig.targetScore, GameConfig.maxMoves);
+
+        cc.log(`[GameController] board: ${this.board.rows}x${this.board.cols}, tiles: ${this.board.getAllTiles().filter(t => !t.isEmpty).length}`);
     }
 
     private initFSM(): void {
@@ -85,11 +102,29 @@ export class GameController extends cc.Component {
 
     private startGame(): void {
         this.fsm.enter('Idle');
-        eventBus.emit('score:changed', { score: this.score.score, delta: 0 });
-        eventBus.emit('moves:changed', { movesLeft: this.score.movesLeft });
+
+        cc.log(`[GameController] boardView: ${this.boardView}`);
+        cc.log(`[GameController] tileSpriteConfig: ${this.tileSpriteConfig}`);
+        cc.log(`[GameController] hudView: ${this.hudView}`);
+
+        if (this.tileSpriteConfig && this.boardView) {
+            const sprites = new SpriteConfigService(this.tileSpriteConfig);
+            this.boardView.init(this.board, BoardConfig, sprites);
+
+            this.boardView.node.on('tile:click', (data: { row: number; col: number }) => {
+                this.onTileClick(data.row, data.col);
+            });
+        } else {
+            cc.error('[GameController] boardView или tileSpriteConfig не привязаны!');
+        }
+
+        if (this.hudView) {
+            this.hudView.refresh(this.score.score, this.score.movesLeft, this.score.targetScore);
+        }
     }
 
     onTileClick(row: number, col: number): void {
+        cc.log(`[GameController] onTileClick: ${row}, ${col}`);
         if (!this.fsm.is('Idle')) return;
 
         const tile = this.board.getTile(row, col);
@@ -108,7 +143,6 @@ export class GameController extends cc.Component {
 
     onBoosterBomb(row: number, col: number): void {
         if (!this.fsm.is('Idle')) return;
-
         this.fsm.enter('Processing');
         new BoosterBombCommand(this.board, this.score, GameConfig, row, col, BoosterConfig.bombRadius).execute();
         this.afterBlast();
@@ -116,7 +150,6 @@ export class GameController extends cc.Component {
 
     onBoosterTeleport(rowA: number, colA: number, rowB: number, colB: number): void {
         if (!this.fsm.is('Idle')) return;
-
         new BoosterTeleportCommand(this.board, rowA, colA, rowB, colB).execute();
     }
 
@@ -133,7 +166,6 @@ export class GameController extends cc.Component {
 
     private fillBoard(): void {
         const colors = ['blue', 'green', 'yellow', 'red', 'purple'].slice(0, BoardConfig.colorCount);
-
         this.board.getAllTiles().forEach(t => {
             if (t.isEmpty) {
                 t.type = colors[Math.floor(Math.random() * colors.length)] as any;
@@ -173,11 +205,18 @@ export class GameController extends cc.Component {
         container.clear();
         this.registerDependencies();
         this.initServices();
-
         this.fsm.enter('Idle');
+
+        if (this.tileSpriteConfig && this.boardView) {
+            const sprites = new SpriteConfigService(this.tileSpriteConfig);
+            this.boardView.init(this.board, BoardConfig, sprites);
+        }
+
+        if (this.hudView) {
+            this.hudView.refresh(this.score.score, this.score.movesLeft, this.score.targetScore);
+        }
+
         eventBus.emit('game:restart');
-        eventBus.emit('score:changed', { score: this.score.score, delta: 0 });
-        eventBus.emit('moves:changed', { movesLeft: this.score.movesLeft });
     }
 
     private subscribeEvents(): void {

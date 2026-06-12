@@ -12,6 +12,9 @@ export class HUDView extends cc.Component {
     @property(cc.Label)
     movesLabel: cc.Label = null;
 
+    @property(cc.Label)
+    targetScoreLabel: cc.Label = null;
+
     @property(cc.Button)
     boosterBombBtn: cc.Button = null;
 
@@ -29,6 +32,12 @@ export class HUDView extends cc.Component {
     onDestroy(): void {
         eventBus.offAll(this.setScore.bind(this));
         eventBus.offAll(this.setMoves.bind(this));
+    }
+
+    refresh(score: number, movesLeft: number, targetScore: number): void {
+        this.setScore(score);
+        this.setMoves(movesLeft);
+        if (this.targetScoreLabel) this.targetScoreLabel.string = `${targetScore}`;
     }
 
     private setScore(score: number): void {

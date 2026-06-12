@@ -10,10 +10,10 @@ export interface IBoardConfig {
 
 export const BoardConfig: IBoardConfig = {
     cols:               7,
-    rows:               9,
+    rows:               8,
     colorCount:         5,
     minGroupSize:       2,
     superTileThreshold: 5,
-    tileSize:           80,
-    tileSpacing:        4,
+    tileSize:           50,
+    tileSpacing:        20,
 };
