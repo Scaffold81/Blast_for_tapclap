@@ -9,6 +9,7 @@ import { eventBus }              from '../../Core/Events/EventBus';
 const { ccclass, property } = cc._decorator;
 
 const FALL_STEP_DELAY = 0.04;
+const SWAP_DURATION   = 0.2;
 
 /** Визуальное представление игрового поля. Создаёт и позиционирует TileView, реагирует на игровые события. */
 @ccclass
@@ -24,6 +25,7 @@ export class BoardView extends cc.Component {
     private _colTopRowByCol: Map<number, number>        = new Map();
     private _blastPromise:   Promise<void>              = Promise.resolve();
     private _blastResolve:   (() => void) | null        = null;
+    private _pressedKey:     string                     = '';
 
     init(board: BoardModel, config: IBoardConfig, sprites: ISpriteConfigService): void {
         this.config  = config;
@@ -37,6 +39,25 @@ export class BoardView extends cc.Component {
         eventBus.offAll(this.onBlastComplete.bind(this));
         eventBus.offAll(this.onFallComplete.bind(this));
         eventBus.offAll(this.onFillComplete.bind(this));
+        eventBus.offAll(this.onTilesSwapped.bind(this));
+    }
+
+    /** Выделить тайл (уменьшить scale) — для режима бустера. */
+    pressTile(row: number, col: number): void {
+        this.releasePressed();
+        const key  = this.key(row, col);
+        const view = this.views.get(key);
+        if (!view) return;
+        this._pressedKey = key;
+        view.playPress();
+    }
+
+    /** Сбросить выделение текущего тайла. */
+    releasePressed(): void {
+        if (!this._pressedKey) return;
+        const view = this.views.get(this._pressedKey);
+        if (view) view.playRelease();
+        this._pressedKey = '';
     }
 
     private buildGrid(board: BoardModel): void {
@@ -57,8 +78,17 @@ export class BoardView extends cc.Component {
 
         this.views.set(this.key(model.row, model.col), view);
 
+        node.on(cc.Node.EventType.TOUCH_START, () => {
+            view.playPress();
+        });
+
         node.on(cc.Node.EventType.TOUCH_END, () => {
+            view.playRelease();
             this.node.emit('tile:click', { row: view.row, col: view.col });
+        });
+
+        node.on(cc.Node.EventType.TOUCH_CANCEL, () => {
+            view.playRelease();
         });
 
         return view;
@@ -68,6 +98,7 @@ export class BoardView extends cc.Component {
         eventBus.on('blast:complete', this.onBlastComplete.bind(this));
         eventBus.on('fall:complete',  this.onFallComplete.bind(this));
         eventBus.on('fill:complete',  this.onFillComplete.bind(this));
+        eventBus.on('tiles:swapped',  this.onTilesSwapped.bind(this));
     }
 
     private onBlastComplete(data: { tiles: TileModel[], clickedTile: TileModel }): void {
@@ -75,10 +106,10 @@ export class BoardView extends cc.Component {
             this._blastResolve = resolve;
         });
 
-        const clickedKey  = this.key(data.clickedTile.row, data.clickedTile.col);
-        const isSuper     = data.clickedTile.isSuper;
-        const superType   = data.clickedTile.superType;
-        const tileType    = data.clickedTile.type;
+        const clickedKey = this.key(data.clickedTile.row, data.clickedTile.col);
+        const isSuper    = data.clickedTile.isSuper;
+        const superType  = data.clickedTile.superType;
+        const tileType   = data.clickedTile.type;
         const promises: Promise<void>[] = [];
 
         data.tiles.forEach(tile => {
@@ -87,7 +118,6 @@ export class BoardView extends cc.Component {
             if (!view) return;
 
             if (key === clickedKey && isSuper) {
-                // Явно передаём тип — TileView хранит его сам
                 view.setType(tileType, superType);
                 view.playSpawn();
                 return;
@@ -103,6 +133,33 @@ export class BoardView extends cc.Component {
                 this._blastResolve = null;
             }
         });
+    }
+
+    private onTilesSwapped(data: { tileA: TileModel, tileB: TileModel }): void {
+        const keyA = this.key(data.tileA.row, data.tileA.col);
+        const keyB = this.key(data.tileB.row, data.tileB.col);
+
+        const viewA = this.views.get(keyA);
+        const viewB = this.views.get(keyB);
+
+        if (!viewA || !viewB) return;
+
+        const posA = this.tilePosition(data.tileA.row, data.tileA.col);
+        const posB = this.tilePosition(data.tileB.row, data.tileB.col);
+
+        cc.tween(viewA.node).to(SWAP_DURATION, { x: posB.x, y: posB.y }, { easing: 'quadInOut' }).start();
+        cc.tween(viewB.node).to(SWAP_DURATION, { x: posA.x, y: posA.y }, { easing: 'quadInOut' }).start();
+
+        this.views.delete(keyA);
+        this.views.delete(keyB);
+        this.views.set(keyA, viewB);
+        this.views.set(keyB, viewA);
+
+        viewA.moveTo(data.tileB.row, data.tileB.col);
+        viewB.moveTo(data.tileA.row, data.tileA.col);
+
+        viewA.setType(data.tileA.type, data.tileA.superType);
+        viewB.setType(data.tileB.type, data.tileB.superType);
     }
 
     private onFallComplete(data: { changes: FallChange[] }): void {
@@ -177,9 +234,8 @@ export class BoardView extends cc.Component {
                 }
 
                 const targetPos = this.tilePosition(tile.row, tile.col);
-
-                const node = cc.instantiate(this.tilePrefab);
-                node.parent = this.node;
+                const node      = cc.instantiate(this.tilePrefab);
+                node.parent     = this.node;
                 node.setPosition(cc.v2(spawnX, spawnY));
 
                 const view = node.getComponent(TileView) || node.addComponent(TileView);
@@ -188,9 +244,12 @@ export class BoardView extends cc.Component {
 
                 this.views.set(tileKey, view);
 
-                node.on(cc.Node.EventType.TOUCH_END, () => {
+                node.on(cc.Node.EventType.TOUCH_START, () => { view.playPress(); });
+                node.on(cc.Node.EventType.TOUCH_END,   () => {
+                    view.playRelease();
                     this.node.emit('tile:click', { row: view.row, col: view.col });
                 });
+                node.on(cc.Node.EventType.TOUCH_CANCEL, () => { view.playRelease(); });
 
                 const fallPromise = view.playFall(targetPos.y, 0);
                 spawnNext(index + 1, fallPromise);

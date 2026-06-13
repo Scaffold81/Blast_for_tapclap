@@ -1,35 +1,33 @@
-import { GameEventKey, GameEventMap } from './GameEvents';
-
 type Handler<T> = T extends void ? () => void : (data: T) => void;
 
-/** Типизированная шина событий. Связывает слои игры без прямых зависимостей друг от друга. */
-export class EventBus {
+/** Типизированная generic шина событий. Не зависит от конкретных событий игры. */
+export class EventBus<TMap extends Record<string, any>> {
     private handlers: Map<string, Set<Function>> = new Map();
 
-    on<K extends GameEventKey>(event: K, handler: Handler<GameEventMap[K]>): void {
-        if (!this.handlers.has(event)) {
-            this.handlers.set(event, new Set());
+    on<K extends keyof TMap>(event: K, handler: Handler<TMap[K]>): void {
+        const key = event as string;
+        if (!this.handlers.has(key)) {
+            this.handlers.set(key, new Set());
         }
-        this.handlers.get(event)!.add(handler);
+        this.handlers.get(key)!.add(handler);
     }
 
-    off<K extends GameEventKey>(event: K, handler: Handler<GameEventMap[K]>): void {
-        this.handlers.get(event)?.delete(handler);
+    off<K extends keyof TMap>(event: K, handler: Handler<TMap[K]>): void {
+        this.handlers.get(event as string)?.delete(handler);
     }
 
-    /** Снимает все подписки одного хендлера сразу — удобно вызывать в onDestroy. */
     offAll(handler: Function): void {
         this.handlers.forEach(set => set.delete(handler));
     }
 
-    emit<K extends GameEventKey>(
+    emit<K extends keyof TMap>(
         event: K,
-        ...args: GameEventMap[K] extends void ? [] : [GameEventMap[K]]
+        ...args: TMap[K] extends void ? [] : [TMap[K]]
     ): void {
-        this.handlers.get(event)?.forEach(h => h(...args));
+        this.handlers.get(event as string)?.forEach(h => h(...args));
     }
 
-    once<K extends GameEventKey>(event: K, handler: Handler<GameEventMap[K]>): void {
+    once<K extends keyof TMap>(event: K, handler: Handler<TMap[K]>): void {
         const wrapper = (...args: any[]) => {
             (handler as Function)(...args);
             this.off(event, wrapper as any);
@@ -37,11 +35,10 @@ export class EventBus {
         this.on(event, wrapper as any);
     }
 
-    /** Сбрасывает все подписки. */
     clear(): void {
         this.handlers.clear();
     }
 }
 
-/** Глобальный экземпляр шины событий на всю игру. */
-export const eventBus = new EventBus();
+// Реэкспорт для обратной совместимости — все старые импорты продолжают работать
+export { eventBus } from './GameEventBus';

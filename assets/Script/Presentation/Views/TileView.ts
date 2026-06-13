@@ -7,6 +7,8 @@ const { ccclass } = cc._decorator;
 const FALL_DURATION  = 0.3;
 const SPAWN_DURATION = 0.2;
 const BLAST_DURATION = 0.15;
+const PRESS_SCALE    = 1.1;
+const PRESS_DURATION = 0.08;
 const NONE_SUPER     = 'none' as SuperTileType;
 
 /** Визуальное представление одного тайла. Хранит тип явно и сам управляет спрайтом. */
@@ -28,6 +30,7 @@ export class TileView extends cc.Component {
         this._tileType  = model.type;
         this._superType = model.superType;
         this.sprite     = this.getComponent(cc.Sprite);
+        this.node.scale = 1;
         this.applySprite();
     }
 
@@ -43,19 +46,30 @@ export class TileView extends cc.Component {
 
     private applySprite(): void {
         if (!this.sprite || !this.sprites) return;
-
         const isSuper = this._superType !== NONE_SUPER;
-
-        const frame = isSuper
+        const frame   = isSuper
             ? this.sprites.getSuperSprite(this._superType)
             : this.sprites.getSprite(this._tileType);
-
         if (frame) this.sprite.spriteFrame = frame;
     }
 
     moveTo(row: number, col: number): void {
         this.row = row;
         this.col = col;
+    }
+
+    playPress(): void {
+        cc.Tween.stopAllByTarget(this.node);
+        cc.tween(this.node)
+            .to(PRESS_DURATION, { scale: PRESS_SCALE }, { easing: 'quadOut' })
+            .start();
+    }
+
+    playRelease(): void {
+        cc.Tween.stopAllByTarget(this.node);
+        cc.tween(this.node)
+            .to(PRESS_DURATION, { scale: 1.0 }, { easing: 'backOut' })
+            .start();
     }
 
     playSpawn(delay: number = 0): Promise<void> {

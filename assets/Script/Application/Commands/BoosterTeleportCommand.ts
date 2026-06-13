@@ -1,5 +1,6 @@
 import { ICommand }   from './ICommand';
 import { BoardModel } from '../../Domain/Models/BoardModel';
+import { eventBus }   from '../../Core/Events/EventBus';
 
 /** Меняет два тайла местами. */
 export class BoosterTeleportCommand implements ICommand {
@@ -25,5 +26,7 @@ export class BoosterTeleportCommand implements ICommand {
         tileA.superType = tileB.superType;
         tileB.type      = tmpType;
         tileB.superType = tmpSuperType;
+
+        eventBus.emit('tiles:swapped', { tileA, tileB });
     }
 }
