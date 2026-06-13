@@ -10,6 +10,8 @@ import { FallLogic }              from '../Domain/Logic/FallLogic';
 import { ShuffleLogic }           from '../Domain/Logic/ShuffleLogic';
 import { BoardGenerator }         from '../Infrastructure/Generator/BoardGenerator';
 import { SpriteConfigService }    from '../Infrastructure/Sprite/SpriteConfigService';
+import { PoolService }            from '../Infrastructure/Pool/PoolService';
+import { IPoolService }           from '../Infrastructure/Pool/IPoolService';
 import { BlastCommand }           from './Commands/BlastCommand';
 import { ShuffleCommand }         from './Commands/ShuffleCommand';
 import { SuperTileCommand }       from './Commands/SuperTileCommand';
@@ -48,17 +50,18 @@ export class GameController extends cc.Component {
     @property(BoosterPanelView)
     boosterPanelView: BoosterPanelView = null;
 
-    private fsm:                StateMachine;
-    private board:              BoardModel;
-    private score:              ScoreModel;
-    private blast:              BlastLogic;
-    private fall:               FallLogic;
-    private shuffle:            ShuffleLogic;
-    private shufflesLeft:       number;
-    private boosterRegistry:    BoosterRegistry;
-    private superTileRegistry:  SuperTileRegistry;
-    private activeBooster:      IBooster | null = null;
-    private tappedTiles:        TileModel[]     = [];
+    private fsm:               StateMachine;
+    private board:             BoardModel;
+    private score:             ScoreModel;
+    private blast:             BlastLogic;
+    private fall:              FallLogic;
+    private shuffle:           ShuffleLogic;
+    private shufflesLeft:      number;
+    private pool:              IPoolService;
+    private boosterRegistry:   BoosterRegistry;
+    private superTileRegistry: SuperTileRegistry;
+    private activeBooster:     IBooster | null = null;
+    private tappedTiles:       TileModel[]     = [];
 
     onLoad(): void {
         this.registerDependencies();
@@ -71,6 +74,7 @@ export class GameController extends cc.Component {
     }
 
     onDestroy(): void {
+        this.pool.clear();
         eventBus.clear();
     }
 
@@ -83,6 +87,7 @@ export class GameController extends cc.Component {
         container.bind(TYPES.FallLogic,      () => new FallLogic());
         container.bind(TYPES.ShuffleLogic,   () => new ShuffleLogic());
         container.bind(TYPES.BoardGenerator, () => new BoardGenerator());
+        container.bind(TYPES.PoolService,    () => new PoolService());
         container.bind(TYPES.EventBus,       () => eventBus);
     }
 
@@ -90,6 +95,7 @@ export class GameController extends cc.Component {
         this.blast        = container.get<BlastLogic>(TYPES.BlastLogic);
         this.fall         = container.get<FallLogic>(TYPES.FallLogic);
         this.shuffle      = container.get<ShuffleLogic>(TYPES.ShuffleLogic);
+        this.pool         = container.get<IPoolService>(TYPES.PoolService);
         this.shufflesLeft = GameConfig.shuffleMaxCount;
         const generator   = container.get<BoardGenerator>(TYPES.BoardGenerator);
         this.board        = generator.generate(BoardConfig);
@@ -124,8 +130,10 @@ export class GameController extends cc.Component {
     private startGame(): void {
         this.fsm.enter('Idle');
         if (this.tileSpriteConfig && this.boardView) {
+            // Предзагружаем пул — 63 тайла на поле + запас
+            this.pool.preload(this.boardView.tilePrefab, BoardConfig.rows * BoardConfig.cols + 10);
             const sprites = new SpriteConfigService(this.tileSpriteConfig);
-            this.boardView.init(this.board, BoardConfig, sprites);
+            this.boardView.init(this.board, BoardConfig, sprites, this.pool);
             this.boardView.node.on('tile:click', (data: { row: number; col: number }) => {
                 this.onTileClick(data.row, data.col);
             });
@@ -259,6 +267,7 @@ export class GameController extends cc.Component {
     }
 
     private restartGame(): void {
+        this.pool.clear();
         container.clear();
         this.registerDependencies();
         this.initServices();
@@ -269,8 +278,9 @@ export class GameController extends cc.Component {
         if (this.boardView) this.boardView.releasePressed();
         this.fsm.enter('Idle');
         if (this.tileSpriteConfig && this.boardView) {
+            this.pool.preload(this.boardView.tilePrefab, BoardConfig.rows * BoardConfig.cols + 10);
             const sprites = new SpriteConfigService(this.tileSpriteConfig);
-            this.boardView.init(this.board, BoardConfig, sprites);
+            this.boardView.init(this.board, BoardConfig, sprites, this.pool);
         }
         eventBus.emit('score:changed', { score: this.score.score, delta: 0 });
         eventBus.emit('moves:changed', { movesLeft: this.score.movesLeft });

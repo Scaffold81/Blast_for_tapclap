@@ -2,6 +2,7 @@ import { TileView }              from './TileView';
 import { TileModel }             from '../../Domain/Models/TileModel';
 import { BoardModel }            from '../../Domain/Models/BoardModel';
 import { ISpriteConfigService }  from '../../Infrastructure/Sprite/ISpriteConfigService';
+import { IPoolService }          from '../../Infrastructure/Pool/IPoolService';
 import { IBoardConfig }          from '../../Config/BoardConfig';
 import { FallChange }            from '../../Domain/Logic/FallLogic';
 import { eventBus }              from '../../Core/Events/EventBus';
@@ -21,15 +22,20 @@ export class BoardView extends cc.Component {
     private views:           Map<string, TileView>    = new Map();
     private sprites:         ISpriteConfigService;
     private config:          IBoardConfig;
+    private pool:            IPoolService;
     private _colTopPromises: Map<number, Promise<void>> = new Map();
     private _colTopRowByCol: Map<number, number>        = new Map();
     private _blastPromise:   Promise<void>              = Promise.resolve();
     private _blastResolve:   (() => void) | null        = null;
     private _pressedKey:     string                     = '';
 
-    init(board: BoardModel, config: IBoardConfig, sprites: ISpriteConfigService): void {
+    init(board: BoardModel, config: IBoardConfig, sprites: ISpriteConfigService, pool: IPoolService): void {
         this.config  = config;
         this.sprites = sprites;
+        this.pool    = pool;
+
+        this.node.removeAllChildren(true);
+        this.views.clear();
 
         this.buildGrid(board);
         this.subscribeEvents();
@@ -42,7 +48,6 @@ export class BoardView extends cc.Component {
         eventBus.offAll(this.onTilesSwapped.bind(this));
     }
 
-    /** Выделить тайл (уменьшить scale) — для режима бустера. */
     pressTile(row: number, col: number): void {
         this.releasePressed();
         const key  = this.key(row, col);
@@ -52,7 +57,6 @@ export class BoardView extends cc.Component {
         view.playPress();
     }
 
-    /** Сбросить выделение текущего тайла. */
     releasePressed(): void {
         if (!this._pressedKey) return;
         const view = this.views.get(this._pressedKey);
@@ -69,8 +73,9 @@ export class BoardView extends cc.Component {
     }
 
     private spawnTileView(model: TileModel): TileView {
-        const node = cc.instantiate(this.tilePrefab);
+        const node = this.pool.acquire(this.tilePrefab);
         node.parent = this.node;
+        node.scale  = 1;
         node.setPosition(this.tilePosition(model.row, model.col));
 
         const view = node.getComponent(TileView) || node.addComponent(TileView);
@@ -78,20 +83,22 @@ export class BoardView extends cc.Component {
 
         this.views.set(this.key(model.row, model.col), view);
 
-        node.on(cc.Node.EventType.TOUCH_START, () => {
-            view.playPress();
-        });
-
-        node.on(cc.Node.EventType.TOUCH_END, () => {
+        node.on(cc.Node.EventType.TOUCH_START, () => { view.playPress(); });
+        node.on(cc.Node.EventType.TOUCH_END,   () => {
             view.playRelease();
             this.node.emit('tile:click', { row: view.row, col: view.col });
         });
-
-        node.on(cc.Node.EventType.TOUCH_CANCEL, () => {
-            view.playRelease();
-        });
+        node.on(cc.Node.EventType.TOUCH_CANCEL, () => { view.playRelease(); });
 
         return view;
+    }
+
+    private releaseView(key: string, view: TileView): void {
+        this.views.delete(key);
+        view.node.off(cc.Node.EventType.TOUCH_START);
+        view.node.off(cc.Node.EventType.TOUCH_END);
+        view.node.off(cc.Node.EventType.TOUCH_CANCEL);
+        this.pool.release(view.node);
     }
 
     private subscribeEvents(): void {
@@ -124,7 +131,14 @@ export class BoardView extends cc.Component {
             }
 
             this.views.delete(key);
-            promises.push(view.playBlast().then(() => view.node.destroy()));
+            promises.push(
+                view.playBlast().then(() => {
+                    view.node.off(cc.Node.EventType.TOUCH_START);
+                    view.node.off(cc.Node.EventType.TOUCH_END);
+                    view.node.off(cc.Node.EventType.TOUCH_CANCEL);
+                    this.pool.release(view.node);
+                })
+            );
         });
 
         Promise.all(promises).then(() => {
@@ -141,7 +155,6 @@ export class BoardView extends cc.Component {
 
         const viewA = this.views.get(keyA);
         const viewB = this.views.get(keyB);
-
         if (!viewA || !viewB) return;
 
         const posA = this.tilePosition(data.tileA.row, data.tileA.col);
@@ -187,7 +200,6 @@ export class BoardView extends cc.Component {
 
             const col        = change.from.col;
             const currentTop = this._colTopRowByCol.get(col) ?? 999;
-
             if (change.from.row < currentTop) {
                 this._colTopPromises.set(col, promise);
                 this._colTopRowByCol.set(col, change.from.row);
@@ -234,8 +246,9 @@ export class BoardView extends cc.Component {
                 }
 
                 const targetPos = this.tilePosition(tile.row, tile.col);
-                const node      = cc.instantiate(this.tilePrefab);
+                const node      = this.pool.acquire(this.tilePrefab);
                 node.parent     = this.node;
+                node.scale      = 1;
                 node.setPosition(cc.v2(spawnX, spawnY));
 
                 const view = node.getComponent(TileView) || node.addComponent(TileView);

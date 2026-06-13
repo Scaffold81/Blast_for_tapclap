@@ -7,18 +7,15 @@ export class PoolService implements IPoolService {
 
     acquire(prefab: cc.Prefab): cc.Node {
         const pool = this.getOrCreate(prefab);
-
         if (pool.size() > 0) {
             return pool.get();
         }
-
         return cc.instantiate(prefab);
     }
 
     release(node: cc.Node): void {
         const key  = node.name;
         const pool = this.pools.get(key);
-
         if (pool) {
             pool.put(node);
         } else {
@@ -28,7 +25,6 @@ export class PoolService implements IPoolService {
 
     preload(prefab: cc.Prefab, count: number): void {
         const pool = this.getOrCreate(prefab);
-
         for (let i = 0; i < count; i++) {
             pool.put(cc.instantiate(prefab));
         }
@@ -41,11 +37,9 @@ export class PoolService implements IPoolService {
 
     private getOrCreate(prefab: cc.Prefab): cc.NodePool {
         const key = prefab.name;
-
         if (!this.pools.has(key)) {
             this.pools.set(key, new cc.NodePool());
         }
-
         return this.pools.get(key)!;
     }
 }
