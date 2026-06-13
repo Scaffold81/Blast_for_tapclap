@@ -1,38 +1,54 @@
-import { TileModel }             from '../../Domain/Models/TileModel';
-import { ISpriteConfigService }  from '../../Infrastructure/Sprite/ISpriteConfigService';
+import { TileModel }            from '../../Domain/Models/TileModel';
+import { TileType, SuperTileType } from '../../Domain/Models/TileType';
+import { ISpriteConfigService } from '../../Infrastructure/Sprite/ISpriteConfigService';
 
 const { ccclass } = cc._decorator;
 
 const FALL_DURATION  = 0.3;
 const SPAWN_DURATION = 0.2;
 const BLAST_DURATION = 0.15;
+const NONE_SUPER     = 'none' as SuperTileType;
 
-/** Визуальное представление одного тайла. Знает свою текущую позицию на сетке. */
+/** Визуальное представление одного тайла. Хранит тип явно и сам управляет спрайтом. */
 @ccclass
 export class TileView extends cc.Component {
 
-    private model:   TileModel;
-    private sprites: ISpriteConfigService;
-    private sprite:  cc.Sprite;
+    private sprites:    ISpriteConfigService;
+    private sprite:     cc.Sprite;
+    private _tileType:  TileType;
+    private _superType: SuperTileType;
 
     row: number = 0;
     col: number = 0;
 
     init(model: TileModel, sprites: ISpriteConfigService): void {
-        this.model   = model;
-        this.sprites = sprites;
-        this.row     = model.row;
-        this.col     = model.col;
-        this.sprite  = this.getComponent(cc.Sprite);
-        this.updateSprite();
+        this.sprites    = sprites;
+        this.row        = model.row;
+        this.col        = model.col;
+        this._tileType  = model.type;
+        this._superType = model.superType;
+        this.sprite     = this.getComponent(cc.Sprite);
+        this.applySprite();
+    }
+
+    setType(tileType: TileType, superType: SuperTileType): void {
+        this._tileType  = tileType;
+        this._superType = superType;
+        this.applySprite();
     }
 
     updateSprite(): void {
-        if (!this.sprite) return;
+        this.applySprite();
+    }
 
-        const frame = this.model.isSuper
-            ? this.sprites.getSuperSprite(this.model.superType)
-            : this.sprites.getSprite(this.model.type);
+    private applySprite(): void {
+        if (!this.sprite || !this.sprites) return;
+
+        const isSuper = this._superType !== NONE_SUPER;
+
+        const frame = isSuper
+            ? this.sprites.getSuperSprite(this._superType)
+            : this.sprites.getSprite(this._tileType);
 
         if (frame) this.sprite.spriteFrame = frame;
     }

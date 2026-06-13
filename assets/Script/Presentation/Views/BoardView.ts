@@ -70,17 +70,28 @@ export class BoardView extends cc.Component {
         eventBus.on('fill:complete',  this.onFillComplete.bind(this));
     }
 
-    private onBlastComplete(data: { tiles: TileModel[] }): void {
+    private onBlastComplete(data: { tiles: TileModel[], clickedTile: TileModel }): void {
         this._blastPromise = new Promise(resolve => {
             this._blastResolve = resolve;
         });
 
+        const clickedKey  = this.key(data.clickedTile.row, data.clickedTile.col);
+        const isSuper     = data.clickedTile.isSuper;
+        const superType   = data.clickedTile.superType;
+        const tileType    = data.clickedTile.type;
         const promises: Promise<void>[] = [];
 
         data.tiles.forEach(tile => {
             const key  = this.key(tile.row, tile.col);
             const view = this.views.get(key);
             if (!view) return;
+
+            if (key === clickedKey && isSuper) {
+                // Явно передаём тип — TileView хранит его сам
+                view.setType(tileType, superType);
+                view.playSpawn();
+                return;
+            }
 
             this.views.delete(key);
             promises.push(view.playBlast().then(() => view.node.destroy()));
@@ -135,7 +146,6 @@ export class BoardView extends cc.Component {
         });
 
         byCol.forEach((tiles, col) => {
-            // Снизу вверх — row:2 первым, row:1 вторым, row:0 последним
             tiles.sort((a, b) => b.row - a.row);
             const waitFor = this._colTopPromises.get(col) || this._blastPromise;
             this.spawnChain(tiles, col, waitFor);
@@ -157,7 +167,15 @@ export class BoardView extends cc.Component {
             if (index >= tiles.length) return;
 
             waitFor.then(() => {
-                const tile      = tiles[index];
+                const tile    = tiles[index];
+                const tileKey = this.key(tile.row, tile.col);
+
+                const existing = this.views.get(tileKey);
+                if (existing) {
+                    spawnNext(index + 1, Promise.resolve());
+                    return;
+                }
+
                 const targetPos = this.tilePosition(tile.row, tile.col);
 
                 const node = cc.instantiate(this.tilePrefab);
@@ -168,7 +186,7 @@ export class BoardView extends cc.Component {
                 view.init(tile, this.sprites);
                 view.moveTo(tile.row, tile.col);
 
-                this.views.set(this.key(tile.row, tile.col), view);
+                this.views.set(tileKey, view);
 
                 node.on(cc.Node.EventType.TOUCH_END, () => {
                     this.node.emit('tile:click', { row: view.row, col: view.col });

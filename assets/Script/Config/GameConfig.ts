@@ -7,7 +7,7 @@ export interface IGameConfig {
 }
 
 export const GameConfig: IGameConfig = {
-    targetScore:     500,
+    targetScore:     2500,
     maxMoves:        30,
     shuffleMaxCount: 3,
     scorePerTile:    10,

@@ -3090,10 +3090,10 @@
       }
     ],
     "superRow": {
-      "__uuid__": "42736551-306c-48dd-943b-6d9428f6e3e8"
+      "__uuid__": "b8b07a4a-3cab-421e-b9d1-68f0238c13fa"
     },
     "superCol": {
-      "__uuid__": "b8b07a4a-3cab-421e-b9d1-68f0238c13fa"
+      "__uuid__": "42736551-306c-48dd-943b-6d9428f6e3e8"
     },
     "superBomb": {
       "__uuid__": "c592017b-9161-4eca-95b8-cc4d44002c08"
@@ -3181,7 +3181,7 @@
   },
   {
     "__type__": "TileSpriteRecord",
-    "id": "yellow",
+    "id": "purple",
     "spriteFrame": {
       "__uuid__": "821d12c7-4640-4299-934a-e25f2ada5354"
     }
@@ -3195,7 +3195,7 @@
   },
   {
     "__type__": "TileSpriteRecord",
-    "id": "purple",
+    "id": "yellow",
     "spriteFrame": {
       "__uuid__": "51cdabb1-2f19-4352-b43f-600a12cf32bd"
     }

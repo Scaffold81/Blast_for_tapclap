@@ -4,6 +4,8 @@ export interface IBoardConfig {
     colorCount:           number;
     minGroupSize:         number;
     superTileThreshold:   number;
+    superBombThreshold:   number;
+    superMaxThreshold:    number;
     tileSize:             number;
     tileSpacing:          number;
 }
@@ -13,7 +15,9 @@ export const BoardConfig: IBoardConfig = {
     rows:               8,
     colorCount:         5,
     minGroupSize:       2,
-    superTileThreshold: 5,
+    superTileThreshold: 2,
+    superBombThreshold: 6,
+    superMaxThreshold:  9,
     tileSize:           50,
     tileSpacing:        20,
 };
