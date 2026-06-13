@@ -17,6 +17,8 @@ import { BoosterRegistry }        from './Boosters/BoosterRegistry';
 import { BombBooster }            from './Boosters/BombBooster';
 import { TeleportBooster }        from './Boosters/TeleportBooster';
 import { IBooster }               from './Boosters/IBooster';
+import { SuperTileRegistry }      from './SuperTiles/SuperTileRegistry';
+import { RowEffect, ColEffect, BombEffect, MaxEffect } from './SuperTiles/SuperTileEffects';
 import { IdleState }              from './States/IdleState';
 import { ProcessingState }        from './States/ProcessingState';
 import { FallingState }           from './States/FallingState';
@@ -46,22 +48,24 @@ export class GameController extends cc.Component {
     @property(BoosterPanelView)
     boosterPanelView: BoosterPanelView = null;
 
-    private fsm:             StateMachine;
-    private board:           BoardModel;
-    private score:           ScoreModel;
-    private blast:           BlastLogic;
-    private fall:            FallLogic;
-    private shuffle:         ShuffleLogic;
-    private shufflesLeft:    number;
-    private boosterRegistry: BoosterRegistry;
-    private activeBooster:   IBooster | null = null;
-    private tappedTiles:     TileModel[]     = [];
+    private fsm:                StateMachine;
+    private board:              BoardModel;
+    private score:              ScoreModel;
+    private blast:              BlastLogic;
+    private fall:               FallLogic;
+    private shuffle:            ShuffleLogic;
+    private shufflesLeft:       number;
+    private boosterRegistry:    BoosterRegistry;
+    private superTileRegistry:  SuperTileRegistry;
+    private activeBooster:      IBooster | null = null;
+    private tappedTiles:        TileModel[]     = [];
 
     onLoad(): void {
         this.registerDependencies();
         this.initServices();
         this.initFSM();
         this.initBoosters();
+        this.initSuperTiles();
         this.subscribeEvents();
         this.startGame();
     }
@@ -107,6 +111,14 @@ export class GameController extends cc.Component {
         this.boosterRegistry = new BoosterRegistry();
         this.boosterRegistry.register(new BombBooster(BoosterConfig));
         this.boosterRegistry.register(new TeleportBooster());
+    }
+
+    private initSuperTiles(): void {
+        this.superTileRegistry = new SuperTileRegistry();
+        this.superTileRegistry.register(new RowEffect());
+        this.superTileRegistry.register(new ColEffect());
+        this.superTileRegistry.register(new BombEffect());
+        this.superTileRegistry.register(new MaxEffect());
     }
 
     private startGame(): void {
@@ -155,9 +167,9 @@ export class GameController extends cc.Component {
         if (!tile || tile.isEmpty) return;
         this.fsm.enter('Processing');
         if (tile.isSuper) {
-            new SuperTileCommand(this.board, this.score, GameConfig, row, col).execute();
+            new SuperTileCommand(this.board, this.score, GameConfig, this.superTileRegistry, row, col).execute();
         } else {
-            new BlastCommand(this.board, this.score, this.blast, GameConfig, BoardConfig, row, col).execute();
+            new BlastCommand(this.board, this.score, this.blast, GameConfig, BoardConfig, this.superTileRegistry, row, col).execute();
         }
         this.afterBlast();
     }
@@ -193,8 +205,6 @@ export class GameController extends cc.Component {
 
         this.fsm.enter('Processing');
         booster.execute(tiles, this.board, this.score, GameConfig);
-
-        // Эмитим событие завершения бустера — BoosterPanelView сам обновится
         eventBus.emit('booster:complete', { boosterType });
 
         this.afterBlast();
@@ -253,6 +263,7 @@ export class GameController extends cc.Component {
         this.registerDependencies();
         this.initServices();
         this.initBoosters();
+        this.initSuperTiles();
         this.activeBooster = null;
         this.tappedTiles   = [];
         if (this.boardView) this.boardView.releasePressed();

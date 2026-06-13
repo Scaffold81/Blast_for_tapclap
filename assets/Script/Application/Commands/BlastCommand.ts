@@ -1,13 +1,14 @@
-import { ICommand }         from './ICommand';
-import { BoardModel }       from '../../Domain/Models/BoardModel';
-import { ScoreModel }       from '../../Domain/Models/ScoreModel';
-import { BlastLogic }       from '../../Domain/Logic/BlastLogic';
-import { SuperTileCommand } from './SuperTileCommand';
-import { IGameConfig }      from '../../Config/GameConfig';
-import { IBoardConfig }     from '../../Config/BoardConfig';
-import { SuperTileType }    from '../../Domain/Models/TileType';
-import { TileModel }        from '../../Domain/Models/TileModel';
-import { eventBus }         from '../../Core/Events/EventBus';
+import { ICommand }          from './ICommand';
+import { BoardModel }        from '../../Domain/Models/BoardModel';
+import { ScoreModel }        from '../../Domain/Models/ScoreModel';
+import { BlastLogic }        from '../../Domain/Logic/BlastLogic';
+import { SuperTileCommand }  from './SuperTileCommand';
+import { SuperTileRegistry } from '../SuperTiles/SuperTileRegistry';
+import { IGameConfig }       from '../../Config/GameConfig';
+import { IBoardConfig }      from '../../Config/BoardConfig';
+import { SuperTileType }     from '../../Domain/Models/TileType';
+import { TileModel }         from '../../Domain/Models/TileModel';
+import { eventBus }          from '../../Core/Events/EventBus';
 
 const S_ROW  = 'row'  as SuperTileType;
 const S_COL  = 'col'  as SuperTileType;
@@ -23,13 +24,13 @@ export class BlastCommand implements ICommand {
         private blast:       BlastLogic,
         private gameConfig:  IGameConfig,
         private boardConfig: IBoardConfig,
+        private registry:    SuperTileRegistry,
         private row:         number,
         private col:         number,
     ) {}
 
     execute(): void {
         const result = this.blast.findGroup(this.board, this.row, this.col, this.boardConfig.minGroupSize);
-
         if (!result.isValid) return;
 
         const groupSize   = result.tiles.length;
@@ -40,12 +41,10 @@ export class BlastCommand implements ICommand {
         const clickedTile = this.board.getTile(this.row, this.col)!;
         const savedType   = clickedTile.type;
 
-        // Сохраняем данные супертайлов из группы ДО очистки
         const superTilesData = result.tiles
             .filter(t => t.isSuper)
             .map(t => ({ row: t.row, col: t.col, type: t.type, superType: t.superType }));
 
-        // Взрываем группу
         result.tiles.forEach(t => t.setEmpty());
 
         if (spawnSuper) {
@@ -60,13 +59,12 @@ export class BlastCommand implements ICommand {
         eventBus.emit('score:changed',  { score: this.score.score, delta: scoreGain });
         eventBus.emit('moves:changed',  { movesLeft: this.score.movesLeft });
 
-        // Активируем супертайлы из группы — восстанавливаем и активируем
         superTilesData.forEach(saved => {
             const tile = this.board.getTile(saved.row, saved.col);
             if (!tile) return;
             tile.type      = saved.type;
             tile.superType = saved.superType;
-            new SuperTileCommand(this.board, this.score, this.gameConfig, saved.row, saved.col).execute();
+            new SuperTileCommand(this.board, this.score, this.gameConfig, this.registry, saved.row, saved.col).execute();
         });
     }
 
